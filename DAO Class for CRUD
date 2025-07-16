@@ -1,0 +1,121 @@
+import java.sql.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ClassmateDAO {
+
+    // Add entry
+    public boolean addClassmate(String name, LocalDate birthDate) {
+        String sql = "INSERT INTO classmates (name, birth_date) VALUES (?, ?)";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setDate(2, Date.valueOf(birthDate));
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // Update entry
+    public boolean updateClassmate(int id, String name, LocalDate birthDate) {
+        String sql = "UPDATE classmates SET name = ?, birth_date = ? WHERE id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setDate(2, Date.valueOf(birthDate));
+            ps.setInt(3, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // Delete entry
+    public boolean deleteClassmate(int id) {
+        String sql = "DELETE FROM classmates WHERE id = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // Get all classmates sorted by birth date (upcoming birthdays)
+    public List<Classmate> getUpcomingBirthdays() {
+        List<Classmate> list = new ArrayList<>();
+        String sql = "SELECT * FROM classmates ORDER BY MONTH(birth_date), DAY(birth_date)";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(new Classmate(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getDate("birth_date").toLocalDate()));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // Search by name or month
+    public List<Classmate> searchByNameOrMonth(String query) {
+        List<Classmate> list = new ArrayList<>();
+        String sql = "SELECT * FROM classmates WHERE name LIKE ? OR MONTH(birth_date) = ?";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, "%" + query + "%");
+            int month = 0;
+            try {
+                month = Integer.parseInt(query);
+            } catch(Exception e) {
+                month = 0;
+            }
+            ps.setInt(2, month);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Classmate(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getDate("birth_date").toLocalDate()));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // Get birthdays today
+    public List<Classmate> getBirthdaysToday() {
+        List<Classmate> list = new ArrayList<>();
+        String sql = "SELECT * FROM classmates WHERE MONTH(birth_date) = MONTH(CURDATE()) AND DAY(birth_date) = DAY(CURDATE())";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(new Classmate(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getDate("birth_date").toLocalDate()));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+}
