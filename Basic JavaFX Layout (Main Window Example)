@@ -1,0 +1,180 @@
+import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public class BirthdayManagerApp extends Application {
+
+    private ClassmateDAO dao = new ClassmateDAO();
+
+    private TableView<Classmate> table = new TableView<>();
+    private TextField nameField = new TextField();
+    private DatePicker birthDatePicker = new DatePicker();
+    private TextField searchField = new TextField();
+
+    private ObservableList<Classmate> data = FXCollections.observableArrayList();
+
+    @Override
+    public void start(Stage primaryStage) {
+
+        Label titleLabel = new Label("জন্মদিন ব্যবস্থাপক");
+
+        // Table setup
+        TableColumn<Classmate, String> nameCol = new TableColumn<>("নাম");
+        nameCol.setCellValueFactory(c -> javafx.beans.property.SimpleStringProperty.stringExpression(c.getValue().getName()));
+
+        TableColumn<Classmate, LocalDate> birthCol = new TableColumn<>("জন্ম তারিখ");
+        birthCol.setCellValueFactory(c -> javafx.beans.property.SimpleObjectProperty.objectExpression(c.getValue().getBirthDate()));
+
+        table.getColumns().addAll(nameCol, birthCol);
+
+        refreshTable();
+
+        // Buttons with Bangla labels
+        Button addButton = new Button("যোগ করুন");
+        Button updateButton = new Button("আপডেট করুন");
+        Button deleteButton = new Button("মুছে ফেলুন");
+        Button searchButton = new Button("খুঁজুন");
+        Button refreshButton = new Button("তাজা করুন");
+
+        addButton.setOnAction(e -> addEntry());
+        updateButton.setOnAction(e -> updateEntry());
+        deleteButton.setOnAction(e -> deleteEntry());
+        searchButton.setOnAction(e -> searchEntries());
+        refreshButton.setOnAction(e -> refreshTable());
+
+        // Layouts
+        HBox inputBox = new HBox(10,
+                new Label("নাম:"), nameField,
+                new Label("জন্ম:"), birthDatePicker);
+
+        HBox buttonsBox = new HBox(10, addButton, updateButton, deleteButton, refreshButton);
+        HBox searchBox = new HBox(10, new Label("নাম অথবা মাস দিয়ে খুঁজুন:"), searchField, searchButton);
+
+        VBox root = new VBox(10, titleLabel, table, inputBox, buttonsBox, searchBox);
+        root.setPadding(new Insets(15));
+
+        primaryStage.setScene(new Scene(root, 600, 500));
+        primaryStage.setTitle("জন্মদিন ব্যবস্থাপক");
+        primaryStage.show();
+
+        // Show today's birthday notifications on start
+        showTodayBirthdayNotifications();
+    }
+
+    private void refreshTable() {
+        List<Classmate> list = dao.getUpcomingBirthdays();
+        data.setAll(list);
+        table.setItems(data);
+    }
+
+    private void addEntry() {
+        String name = nameField.getText();
+        LocalDate birthDate = birthDatePicker.getValue();
+        if (name.isEmpty() || birthDate == null) {
+            showAlert("ত্রুটি", "অনুগ্রহ করে নাম এবং জন্ম তারিখ প্রদান করুন।");
+            return;
+        }
+        boolean success = dao.addClassmate(name, birthDate);
+        if(success) {
+            showAlert("সাফল্য", "জন্মদিন যোগ করা হয়েছে।");
+            clearInputs();
+            refreshTable();
+        } else {
+            showAlert("ত্রুটি", "জন্মদিন যোগ করতে ব্যর্থ।");
+        }
+    }
+
+    private void updateEntry() {
+        Classmate selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("ত্রুটি", "আপডেটের জন্য একটি এন্ট্রি নির্বাচন করুন।");
+            return;
+        }
+        String name = nameField.getText();
+        LocalDate birthDate = birthDatePicker.getValue();
+        if (name.isEmpty() || birthDate == null) {
+            showAlert("ত্রুটি", "অনুগ্রহ করে নাম এবং জন্ম তারিখ প্রদান করুন।");
+            return;
+        }
+        boolean success = dao.updateClassmate(selected.getId(), name, birthDate);
+        if(success) {
+            showAlert("সাফল্য", "জন্মদিন আপডেট হয়েছে।");
+            clearInputs();
+            refreshTable();
+        } else {
+            showAlert("ত্রুটি", "জন্মদিন আপডেট করতে ব্যর্থ।");
+        }
+    }
+
+    private void deleteEntry() {
+        Classmate selected = table.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("ত্রুটি", "মুছতে একটি এন্ট্রি নির্বাচন করুন।");
+            return;
+        }
+        boolean success = dao.deleteClassmate(selected.getId());
+        if(success) {
+            showAlert("সাফল্য", "জন্মদিন মুছে ফেলা হয়েছে।");
+            refreshTable();
+        } else {
+            showAlert("ত্রুটি", "জন্মদিন মুছে ফেলতে ব্যর্থ।");
+        }
+    }
+
+    private void searchEntries() {
+        String query = searchField.getText();
+        if (query.isEmpty()) {
+            showAlert("তথ্য", "অনুগ্রহ করে অনুসন্ধানের জন্য কিছু লিখুন।");
+            return;
+        }
+        List<Classmate> results = dao.searchByNameOrMonth(query);
+        if(results.isEmpty()){
+            showAlert("তথ্য", "কোনো মিল পাওয়া যায়নি।");
+        }
+        data.setAll(results);
+        table.setItems(data);
+    }
+
+    private void showTodayBirthdayNotifications() {
+        List<Classmate> todays = dao.getBirthdaysToday();
+
+        if (todays.isEmpty()) {
+            return;
+        }
+        StringBuilder message = new StringBuilder("আজকের জন্মদিন:\n");
+        for (Classmate c : todays) {
+            message.append(c.getName()).append("\n");
+        }
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("নোটিফিকেশন");
+        alert.setHeaderText(null);
+        alert.setContentText(message.toString());
+        alert.showAndWait();
+    }
+
+    private void clearInputs() {
+        nameField.clear();
+        birthDatePicker.setValue(null);
+    }
+
+    private void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
